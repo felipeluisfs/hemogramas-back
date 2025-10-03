@@ -75,6 +75,57 @@ app.post('/fhir/observation', (req: Request, res: Response) => {
   });
 });
 
+app.put('/fhir-webhook/Bundle/:id', async (req: Request, res: Response) => {
+  const bundleId = req.params.id;
+
+  console.log('Webhook received Bundle ID:', bundleId);
+
+  try {
+    // Fetch the full Bundle from the FHIR server
+    const fhirUrl = `http://localhost:8080/fhir/Bundle/${bundleId}`;
+    const response = await fetch(fhirUrl, {
+      headers: { 'Accept': 'application/fhir+json' },
+    });
+
+    if (!response.ok) {
+      console.error(`Failed to fetch Bundle ${bundleId}:`, response.statusText);
+      return res.status(500).json({
+        resourceType: 'OperationOutcome',
+        issue: [{
+          severity: 'error',
+          code: 'processing',
+          diagnostics: `Failed to fetch Bundle ${bundleId}`,
+        }],
+      });
+    }
+
+    const bundle = await response.json();
+    console.log('Fetched full Bundle:', JSON.stringify(bundle, null, 2));
+
+    // Respond to HAPI to acknowledge receipt
+    res.status(200).json({
+      resourceType: 'OperationOutcome',
+      issue: [
+        {
+          severity: 'information',
+          code: 'informational',
+          diagnostics: 'Bundle received and fetched successfully',
+        },
+      ],
+    });
+  } catch (err) {
+    console.error('Error fetching Bundle:', err);
+    res.status(500).json({
+      resourceType: 'OperationOutcome',
+      issue: [{
+        severity: 'error',
+        code: 'exception',
+        diagnostics: String(err),
+      }],
+    });
+  }
+});
+
 app.get('/', (req: Request, res: Response) => {
   res.json({ 
     message: 'Receptor FHIR ativo.',
